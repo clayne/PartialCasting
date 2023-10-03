@@ -45,11 +45,78 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Query(const SKSE::QueryInterface* a
 	return true;
 }
 
+bool is_affected_spell([[maybe_unused]] RE::MagicCaster* mcaster, [[maybe_unused]] RE::SpellItem* spel)
+{
+	// TODO
+	return true;
+}
+
+bool charge_time_conditions([[maybe_unused]] RE::MagicCaster* mcaster, [[maybe_unused]] RE::SpellItem* spel)
+{
+	return spel->GetChargeTime() >= 2 * mcaster->castingTimer;
+}
+
+class CastHook
+{
+public:
+	static void Hook()
+	{
+		_InterruptCast = SKSE::GetTrampoline().write_call<5>(REL::ID(41362).address() + 0xca, InterruptCast);
+		_Launch = SKSE::GetTrampoline().write_call<5>(REL::ID(33672).address() + 0x377, Launch);
+	}
+
+private:
+	static void InterruptCast(RE::MagicCaster* mcaster, [[maybe_unused]] bool a_depleteEnergy)
+	{
+		using S = RE::MagicCaster::State;
+
+		if (auto a = mcaster->GetCasterAsActor(); a && a->IsPlayerRef() && mcaster->state.any(S::kCharging, S::kUnk02)) {
+			if (auto spel_ = mcaster->currentSpell; spel_ && spel_->As<RE::MagicItem>() &&
+													spel_->GetDelivery() == RE::MagicSystem::Delivery::kAimed &&
+													spel_->GetCastingType() == RE::MagicSystem::CastingType::kFireAndForget) {
+				if (auto spel = spel_->As<RE::SpellItem>();
+					spel && is_affected_spell(mcaster, spel) && charge_time_conditions(mcaster, spel)) {
+					float old_timer = mcaster->castingTimer;
+					mcaster->castingTimer = 0;
+					// Update
+					_generic_foo_<33622, void(RE::MagicCaster * a, float)>::eval(mcaster, 0);
+
+					a->NotifyAnimationGraph("MRh_SpellRelease_Event");
+
+					mcaster->castingTimer = old_timer;
+					return;
+				}
+			}
+		}
+		return _InterruptCast(mcaster, a_depleteEnergy);
+	}
+
+	static uint32_t* Launch(uint32_t* handle, RE::Projectile::LaunchData* ldata)
+	{
+		if (auto a = ldata->shooter; a && a->IsPlayerRef()) {
+			if (auto mcaster = a->GetMagicCaster(ldata->castingSource);
+				mcaster->castingTimer > 0 && mcaster->currentSpell && mcaster->currentSpell->As<RE::SpellItem>()) {
+				float cast_time = mcaster->currentSpell->GetChargeTime();
+				if (cast_time > 0 && 0.1 * cast_time < mcaster->castingTimer) {
+					float mul = (cast_time - mcaster->castingTimer) / cast_time;
+					ldata->scale *= mul;
+					ldata->power *= mul;
+				}
+				mcaster->castingTimer = 0;
+			}
+		}
+		return _Launch(handle, ldata);
+	}
+
+	static inline REL::Relocation<decltype(InterruptCast)> _InterruptCast;
+	static inline REL::Relocation<decltype(Launch)> _Launch;
+};
+
 static void SKSEMessageHandler(SKSE::MessagingInterface::Message* message)
 {
 	switch (message->type) {
 	case SKSE::MessagingInterface::kDataLoaded:
-		//
+		CastHook::Hook();
 
 		break;
 	}

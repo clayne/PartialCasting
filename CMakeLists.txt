@@ -31,7 +31,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STR
 # ---- Project ----
 
 project(
-	TemplatePluginSSE
+	PartialCasting
 	VERSION 1.0.0
 	LANGUAGES CXX
 )
@@ -75,9 +75,9 @@ endif ()
 # ---- Dependencies ----
 
 if (DEFINED UseUselessUtils AND UseUselessUtils)
-	add_subdirectory($ENV{UselessFenixUtils} ./UselessFenixUtils/build)
+	add_subdirectory($ENV{UselessFenixUtils} ./UselessFenixUtils)
 else ()
-	add_subdirectory($ENV{CommonLibSSE} ./CommonLibSSE/build)
+	add_subdirectory($ENV{CommonLibSSE} ./CommonLibSSE)
 endif ()
 
 find_package(spdlog REQUIRED CONFIG)
