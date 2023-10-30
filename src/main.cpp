@@ -81,7 +81,11 @@ private:
 					// Update
 					_generic_foo_<33622, void(RE::MagicCaster * a, float)>::eval(mcaster, 0);
 
-					a->NotifyAnimationGraph("MRh_SpellRelease_Event");
+					auto hand = mcaster->GetCastingSource();
+					if (hand == RE::MagicSystem::CastingSource::kRightHand)
+						a->NotifyAnimationGraph("MRh_SpellRelease_Event");
+					if (hand == RE::MagicSystem::CastingSource::kLeftHand)
+						a->NotifyAnimationGraph("MLh_SpellRelease_Event");
 
 					mcaster->castingTimer = old_timer;
 					return;
